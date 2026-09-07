@@ -1,0 +1,10 @@
+{
+  "tab": "camp_checklist:pneumaticcraft",
+  "type": "manual",
+  "title": "Programmable Drone Automation",
+  "description": "직접 프로그래밍한 Drone으로 단순 운송을 제외한 3단계 이상의 연속 자동화 공정을 구축합니다.",
+  "target": 1,
+  "unit": "count",
+  "order": 10,
+  "icon": "pneumaticcraft:drone"
+}

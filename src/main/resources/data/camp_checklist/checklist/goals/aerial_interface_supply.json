@@ -1,0 +1,10 @@
+{
+  "tab": "camp_checklist:pneumaticcraft",
+  "type": "manual",
+  "title": "Aerial Interface Supply System",
+  "description": "Aerial Interface를 사용하여 플레이어에게 아이템 또는 소모품을 자동으로 보급하는 시스템을 구축합니다.",
+  "target": 1,
+  "unit": "count",
+  "order": 40,
+  "icon": "pneumaticcraft:aerial_interface"
+}

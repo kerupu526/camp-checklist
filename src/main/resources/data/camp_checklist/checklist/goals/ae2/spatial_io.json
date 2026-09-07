@@ -1,0 +1,14 @@
+{
+  "tab": "camp_checklist:ae2",
+  "type": "manual",
+  "title": "Spatial IO 11×11 규모 구축",
+  "description": "AE2 Spatial IO 설비를 11×11 규모로 구축합니다. 실제 유효 volume 규칙은 플레이 중 함께 확인합니다.",
+  "target": 1,
+  "unit": "count",
+  "order": 30,
+  "icon": "ae2:spatial_io_port",
+  "parameters": {
+    "structure": "spatial_io",
+    "scale": "11x11"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "tab": "camp_checklist:mekanism",
+  "type": "custom",
+  "checker": "camp_checklist:mekanism_modules",
+  "title": "MekaSuit / Meka-Tool 기능성 모듈",
+  "description": "한 플레이어가 실용적인 Meka 장비 모듈 7개를 장착하고 활성화합니다.",
+  "icon": "mekanism:module_jetpack_unit",
+  "order": 30,
+  "target": 7,
+  "unit": "count",
+  "parameters": {
+    "require_same_player": true,
+    "required_modules": [
+      { "item": "mekanism:mekasuit_helmet", "slot": "helmet", "module": "mekanism:vision_enhancement_unit", "min_count": 1, "require_enabled": true },
+      { "item": "mekanism:mekasuit_helmet", "slot": "helmet", "module": "mekanism:electrolytic_breathing_unit", "min_count": 1, "require_enabled": true },
+      { "item": "mekanism:mekasuit_bodyarmor", "slot": "bodyarmor", "module": "mekanism:jetpack_unit", "min_count": 1, "require_enabled": true },
+      { "item": "mekanism:mekasuit_bodyarmor", "slot": "bodyarmor", "module": "mekanism:charge_distribution_unit", "min_count": 1, "require_enabled": true },
+      { "item": "mekanism:meka_tool", "slot": "inventory", "module": "mekanism:vein_mining_unit", "min_count": 1, "require_enabled": true },
+      { "item": "mekanism:meka_tool", "slot": "inventory", "module": "mekanism:excavation_escalation_unit", "min_count": 1, "require_enabled": true },
+      { "item": "mekanism:meka_tool", "slot": "inventory", "module": "mekanism:attack_amplification_unit", "min_count": 1, "require_enabled": true }
+    ]
+  }
+}

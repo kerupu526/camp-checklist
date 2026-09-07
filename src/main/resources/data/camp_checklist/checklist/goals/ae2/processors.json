@@ -1,0 +1,18 @@
+{
+  "tab": "camp_checklist:ae2",
+  "type": "custom",
+  "checker": "camp_checklist:item_stockpile_set",
+  "title": "AE2 Processor 3종 확보",
+  "description": "Logic, Calculation, Engineering Processor를 각각 128개 이상 확보합니다.",
+  "target": 384,
+  "unit": "count",
+  "order": 20,
+  "icon": "ae2:engineering_processor",
+  "parameters": {
+    "requirements": [
+      { "item": "ae2:logic_processor", "target": 128 },
+      { "item": "ae2:calculation_processor", "target": 128 },
+      { "item": "ae2:engineering_processor", "target": 128 }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "tab": "camp_checklist:mekanism",
+  "type": "manual",
+  "title": "Fusion Reactor 구축 및 가동",
+  "description": "Fusion Reactor 멀티블록을 완성하고 실제 연료를 공급해 점화·가동한 뒤 체크합니다.",
+  "icon": "mekanismgenerators:fusion_reactor_controller",
+  "order": 40,
+  "unit": "count"
+}

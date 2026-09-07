@@ -1,0 +1,11 @@
+{
+  "tab": "camp_checklist:ae2",
+  "type": "craft_count",
+  "title": "16k Crafting Storage 3개 제작",
+  "description": "AE2 16k Crafting Storage를 3개 제작합니다.",
+  "item": "ae2:16k_crafting_storage",
+  "target": 3,
+  "unit": "count",
+  "order": 10,
+  "icon": "ae2:16k_crafting_storage"
+}

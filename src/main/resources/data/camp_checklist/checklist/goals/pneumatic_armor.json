@@ -1,0 +1,49 @@
+{
+  "tab": "camp_checklist:pneumaticcraft",
+  "type": "custom",
+  "checker": "camp_checklist:pneumaticcraft_armor",
+  "title": "Pneumatic Armor 풀세트",
+  "description": "Pneumatic Armor 풀세트를 착용하고 지정된 주요 업그레이드를 장착합니다.",
+  "target": 7,
+  "unit": "count",
+  "order": 20,
+  "icon": "pneumaticcraft:pneumatic_helmet",
+  "parameters": {
+    "required_armor": [
+      {
+        "item": "pneumaticcraft:pneumatic_helmet",
+        "slot": "head"
+      },
+      {
+        "item": "pneumaticcraft:pneumatic_chestplate",
+        "slot": "chest"
+      },
+      {
+        "item": "pneumaticcraft:pneumatic_leggings",
+        "slot": "legs"
+      },
+      {
+        "item": "pneumaticcraft:pneumatic_boots",
+        "slot": "feet"
+      }
+    ],
+    "required_upgrades": [
+      {
+        "id": "pneumaticcraft:night_vision",
+        "slot": "head",
+        "min_tier": 1
+      },
+      {
+        "id": "pneumaticcraft:charging",
+        "slot": "chest",
+        "min_tier": 1
+      },
+      {
+        "id": "pneumaticcraft:jet_boots",
+        "slot": "feet",
+        "min_tier": 1
+      }
+    ],
+    "require_same_player": true
+  }
+}

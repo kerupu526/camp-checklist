@@ -1,0 +1,12 @@
+{
+  "tab": "camp_checklist:create",
+  "type": "custom",
+  "checker": "camp_checklist:create_train_distance",
+  "title": "기차로 16km 이동",
+  "description": "한 플레이어가 Create 기차에 탑승하여 누적 16km를 이동합니다.",
+  "target": 16000,
+  "unit": "blocks",
+  "display_unit": "kilometers",
+  "order": 10,
+  "icon": "create:train"
+}

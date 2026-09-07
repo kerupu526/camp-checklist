@@ -1,0 +1,5 @@
+// Keep TabView's generated content viewport inside the authored fixed-height panel.
+.__tab-view_tab_content_container__ {
+  min-height: 0;
+  flex-basis: 0;
+}

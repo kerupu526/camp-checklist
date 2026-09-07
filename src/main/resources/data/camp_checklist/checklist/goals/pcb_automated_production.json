@@ -1,0 +1,10 @@
+{
+  "tab": "camp_checklist:pneumaticcraft",
+  "type": "manual",
+  "title": "Automated PCB Production",
+  "description": "PCB 제작 공정을 완전 자동화하고 Printed Circuit Board 128개를 생산합니다.",
+  "target": 1,
+  "unit": "count",
+  "order": 30,
+  "icon": "pneumaticcraft:printed_circuit_board"
+}

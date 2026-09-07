@@ -1,0 +1,18 @@
+{
+  "tab": "camp_checklist:ae2",
+  "type": "manual",
+  "title": "무선 단말 4개와 Quantum Network Bridge",
+  "description": "플레이어들이 사용할 AE2 Wireless Terminal 계열 아이템 4개를 준비하고 Quantum Network Bridge를 정상 연결합니다.",
+  "target": 1,
+  "unit": "count",
+  "order": 40,
+  "icon": "ae2:wireless_crafting_terminal",
+  "parameters": {
+    "wireless_terminal_count": 4,
+    "quantum_bridge": {
+      "link": "ae2:quantum_link",
+      "ring": "ae2:quantum_ring",
+      "requires_connected": true
+    }
+  }
+}
