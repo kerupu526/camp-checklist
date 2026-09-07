@@ -1,0 +1,135 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.144'
+}
+
+// Keep machine-specific development choices out of the checked-in build files.
+// Command-line Gradle properties take precedence over this optional local file,
+// followed by environment variables, and finally the portable defaults below.
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('gradle-local.properties')
+if (localPropertiesFile.isFile()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
+def developmentSetting = { String propertyName, String environmentName, String defaultValue ->
+    if (providers.gradleProperty(propertyName).isPresent()) {
+        return providers.gradleProperty(propertyName).get()
+    }
+    if (localProperties.getProperty(propertyName) != null) {
+        return localProperties.getProperty(propertyName)
+    }
+    if (providers.environmentVariable(environmentName).isPresent()) {
+        return providers.environmentVariable(environmentName).get()
+    }
+    return defaultValue
+}
+
+def profileName = developmentSetting('campProfile', 'CAMP_PROFILE', 'ui')
+        .trim().toLowerCase(Locale.ROOT)
+def profileEntries = profileName.split('[,;\\s]+')
+        .collect { it.trim() }
+        .findAll { !it.isEmpty() } as Set
+def unknownProfiles = profileEntries - ['ui', 'all', 'full', 'create', 'ae2', 'mekanism', 'pneumaticcraft']
+if (unknownProfiles) throw new GradleException("Unknown campProfile: ${unknownProfiles}")
+def allIntegrations = profileEntries.contains('all') || profileEntries.contains('full')
+def integrationEnabled = { String name, String legacyProperty ->
+    def value = developmentSetting(legacyProperty, 'CAMP_' + legacyProperty.toUpperCase(Locale.ROOT), '__unset__').trim().toLowerCase(Locale.ROOT)
+    if (value == '__unset__') return allIntegrations || profileEntries.contains(name)
+    if (value in ['', 'true']) return true
+    if (value == 'false') return false
+    throw new GradleException("${legacyProperty} must be true or false")
+}
+
+def enablePneumaticCraft = integrationEnabled('pneumaticcraft', 'withPneumaticCraft')
+def enableCreate = integrationEnabled('create', 'withCreate')
+def enableAe2 = integrationEnabled('ae2', 'withAE2')
+def enableMekanism = integrationEnabled('mekanism', 'withMekanism')
+def enabledMods = [create: enableCreate, ae2: enableAe2, mekanism: enableMekanism, pneumaticcraft: enablePneumaticCraft].findAll { it.value }.keySet().sort()
+def runGameDirectory = developmentSetting('campGameDir', 'CAMP_GAME_DIR', "run/${enabledMods ? enabledMods.join('-') : 'ui'}")
+def addOptionalRunDependency = { String notation, boolean transitive ->
+    def dependency = dependencies.add('runtimeOnly', notation)
+    dependency.transitive = transitive
+}
+
+version = mod_version
+group = mod_group_id
+base { archivesName = mod_id }
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+repositories {
+    mavenCentral()
+    maven {
+        name = 'ModMaven'
+        url = 'https://modmaven.dev/artifactory/local-releases'
+        content {
+            includeGroup 'me.desht.pneumaticcraft'
+            includeGroup 'mekanism'
+        }
+    }
+    maven { url = 'https://maven.createmod.net' }
+    maven { url = 'https://maven.ithundxr.dev/snapshots' }
+    maven { url = 'https://maven.firstdark.dev/snapshots' }
+    maven { url = 'https://maven.blamejared.com' }
+}
+dependencies {
+    def pneumaticcraft = "me.desht.pneumaticcraft:pneumaticcraft-repressurized:${pneumaticcraft_version}"
+    def create = "com.simibubi.create:create-${minecraft_version}:${create_version}"
+    def ponder = "net.createmod.ponder:ponder-neoforge:${ponder_version}"
+    def flywheel = "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}"
+    def registrate = "com.tterrag.registrate:Registrate:${registrate_version}"
+    def mekanism = "mekanism:Mekanism:${mekanism_version}"
+    def ae2 = "org.appliedenergistics:appliedenergistics2:${ae2_version}"
+    compileOnly(pneumaticcraft) { transitive = false }
+    compileOnly("${create}:slim") { transitive = false }
+    compileOnly(ponder) { transitive = false }
+    compileOnly(flywheel) { transitive = false }
+    compileOnly(registrate) { transitive = false }
+    compileOnly(mekanism) { transitive = false }
+    if (enablePneumaticCraft) {
+        addOptionalRunDependency(pneumaticcraft, false)
+    }
+    if (enableCreate) {
+        addOptionalRunDependency("${create}:slim", false)
+        addOptionalRunDependency(ponder, false)
+        addOptionalRunDependency(flywheel, false)
+        addOptionalRunDependency(registrate, false)
+    }
+    if (enableAe2) {
+        // AE2 is used by checklist data/UI validation, not by Java code.
+        // Runtime-only: the compiled integration code never imports AE2 classes.
+        addOptionalRunDependency(ae2, true)
+    }
+    if (enableMekanism) {
+        addOptionalRunDependency(mekanism, false)
+    }
+    implementation("com.lowdragmc.ldlib2:ldlib2-neoforge-${minecraft_version}:${ldlib2_version}:all") {
+        exclude group: 'mezz.jei'
+    }
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+neoForge {
+    version = neo_version
+    runs {
+        client {
+            client()
+            gameDirectory = project.file(runGameDirectory)
+            jvmArgument '-Xmx' + developmentSetting('campHeap', 'CAMP_HEAP', enabledMods ? '4G' : '2G')
+        }
+        server {
+            server()
+            programArgument '--nogui'
+            gameDirectory = project.file(runGameDirectory + '-server')
+        }
+    }
+    mods { camp_checklist { sourceSet sourceSets.main } }
+    unitTest { enable(); testedMod = mods.camp_checklist }
+}
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.named('test') { useJUnitPlatform() }
+tasks.named('processResources') {
+    inputs.properties(mod_version: mod_version, mod_name: mod_name)
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand(mod_version: mod_version, mod_name: mod_name)
+    }
+}

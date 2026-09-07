@@ -1,0 +1,10 @@
+# Copy this file to gradle-local.properties for per-machine defaults.
+# gradle-local.properties is ignored by Git.
+# Command-line -P values take precedence over this file.
+
+# ui is the lightweight default; use create, ae2, mekanism, pneumaticcraft, or all.
+campProfile=ui
+
+# Keep the default inside the project. An absolute path is allowed only here or
+# through CAMP_GAME_DIR when a separate local game directory is required.
+# campGameDir=run/custom
