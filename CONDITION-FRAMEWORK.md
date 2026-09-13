@@ -1,7 +1,7 @@
 # Condition Framework — Phase C6/C7
 
-현재 개발 버전은 0.7.1입니다. 0.7.1은 Phase C6/C7의 저장·네트워크·공개 API 계약을 유지하면서
-UI 템플릿의 작은 창 폭 제약과 resource reload 직후 첫 열기 게이트를 보강한 patch입니다. Phase C3는 기존 CAMP legacy 상태를 새 ConditionResult
+현재 안정 공개 버전은 1.0.0입니다. 1.0.0은 Phase C6/C7의 저장·네트워크·공개 API 계약을 유지하면서
+UI 템플릿의 작은 창 폭 제약과 resource reload 직후 첫 열기 안정성을 포함합니다. Phase C3는 기존 CAMP legacy 상태를 새 ConditionResult
 세계로 읽기 전용 변환하는 compatibility bridge를 추가합니다. 기존 event/checker/storage
 권한은 그대로 유지하며, legacy 자동 migration·command·UI recursive DTO 연결은
 후속 단계입니다. Phase C4는 이 경계를 유지한 채 native condition의 opaque per-node state만
@@ -200,9 +200,9 @@ ConditionResult semantics에는 변화가 없습니다.
 event 종료 후 등록은 거부됩니다. AND/OR/NOT는 SATISFIED/UNSATISFIED/UNAVAILABLE의
 3상태 논리를 사용하고, 결정 가능한 결과를 우선하며 NOT은 Unavailable을 반전하지
 않습니다. Composite 결과는 direct-child aggregate와 recursive `ConditionDetail`을
-보존합니다. tracking signature와 opaque `stateVersion`은 별개입니다. 후속 단계에서
-stable key command/external control, runtime routing, 계산된 detail의 ViewModel 전달을
-진행합니다.
+보존합니다. tracking signature와 opaque `stateVersion`은 별개입니다. 계산된 detail의 ViewModel 전달은
+현재 baseline에 포함됩니다. stable key command/external control은 원래 CAMP 모드팩 Checklist 사용 사례에
+필요하지 않은 선택적 보류 확장(Phase D)으로, 1.0.0에는 포함하지 않습니다.
 
 `UNAVAILABLE` 결과는 현재 public contract에서 설명 가능한 `unavailableReason`을 반드시
 가집니다. numeric progress와 details는 선택적이며, unavailable이어도 이미 계산된

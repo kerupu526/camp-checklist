@@ -6,9 +6,14 @@ condition presentation snapshot까지 구현되어 있습니다. 저장 호환�
 
 실행 검증 결과와 남은 수동 확인 항목은 [개발 환경 검증 기록](DEVELOPMENT-VERIFICATION.md)을 참고하세요.
 
-현재 milestone은 0.7.1입니다. native condition, addon API, native node state, protocol 2의 typed
-recursive presentation snapshot과 내부 의존성 기반 무효화 스케줄러까지 구현되었습니다. 실제 Checklist
-화면의 작은 창 표시와 resource reload 직후 첫 열기 안정성을 보강했으며, 최종 화면 회귀 QA는 별도 확인 항목입니다.
+현재 milestone은 첫 안정 공개 버전인 **1.0.0**입니다. native condition, addon API, native node state,
+protocol 2의 typed recursive presentation snapshot과 내부 의존성 기반 무효화 스케줄러를 포함합니다.
+실제 Checklist 화면은 작은 창 표시와 resource reload 직후 첫 열기까지 수동 QA를 마쳤습니다. 저장 형식은 1,
+네트워크 프로토콜은 2, 공개 API major는 1을 유지합니다.
+
+1.0.0은 CAMP 모드팩의 기존 Checklist 사용 사례를 위한 첫 안정 배포입니다. Phase D의 관리자 명령어와 외부
+조건 제어 API는 이 릴리스에 포함하지 않는 선택적 보류 확장입니다. 카드 영역 grab-drag는 자동화 입력 특성과
+분리하지 못해 별도 미검증으로 남아 있지만, 휠과 스크롤바는 실제 게임 화면에서 확인했습니다.
 
 CAMP Checklist is a NeoForge 1.21.1 mod. The project keeps its Minecraft,
 NeoForge, LDLib2, and optional integration versions in
