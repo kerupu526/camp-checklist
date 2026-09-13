@@ -1,1 +1,18 @@
-{"camp_checklist.toast.title":"Checklist complete","camp_checklist.ui.unavailable":"Unavailable","key.camp_checklist.open":"Open checklist","key.categories.camp_checklist":"CAMP Checklist"}
+{
+  "camp_checklist.toast.title":"Checklist complete",
+  "camp_checklist.ui.unavailable":"Unavailable",
+  "key.camp_checklist.open":"Open checklist",
+  "key.categories.camp_checklist":"CAMP Checklist",
+  "camp_checklist.condition.generic":"Condition",
+  "camp_checklist.condition.and":"All conditions",
+  "camp_checklist.condition.or":"Any condition",
+  "camp_checklist.condition.not":"Condition must not be met",
+  "camp_checklist.condition.advancement":"Advancement completed",
+  "camp_checklist.condition.unavailable_child":"A required condition is unavailable",
+  "camp_checklist.condition.missing_advancement":"Unknown advancement: %s",
+  "camp_checklist.condition.too_deep":"Condition tree exceeds the supported depth",
+  "camp_checklist.condition.unknown":"Unknown condition type: %s",
+  "camp_checklist.condition.invalid_children":"Invalid condition children",
+  "camp_checklist.condition.negation_unsupported":"This condition does not support negation",
+  "camp_checklist.condition.evaluation_failed":"Condition %s could not be evaluated: %s"
+}

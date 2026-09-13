@@ -104,6 +104,7 @@ class ChecklistUiTemplateTest {
                     cards.stream().map(ChecklistUiTemplateTest::cardDescription).toList(), entry.getKey());
         }
         assertEquals(4, fixture.dragBoundScrollerCount());
+        assertEquals(4, fixture.dragUpdateListenerCount());
 
         UIElement createFirst = firstCard(tabView, "camp_checklist:create");
         UIElement mekanismFirst = firstCard(tabView, "camp_checklist:mekanism");
@@ -151,7 +152,10 @@ class ChecklistUiTemplateTest {
         }
 
         CompoundTag rootInline = NbtIo.read(TEMPLATE).getCompound("data").getCompound("template").getCompound("inline");
-        assertEquals(500, rootInline.getCompound("width").getInt("value"));
+        assertEquals("PERCENT", rootInline.getCompound("width").getString("type"));
+        assertEquals(1, rootInline.getCompound("width").getFloat("value"));
+        assertDimension(rootInline, "min-width", "LENGTH", 0);
+        assertDimension(rootInline, "max-width", "LENGTH", 500);
         assertEquals(300, rootInline.getCompound("height").getInt("value"));
         assertDimension(rootInline, "min-height", "LENGTH", 0);
         assertDimension(rootInline, "max-height", "LENGTH", 300);

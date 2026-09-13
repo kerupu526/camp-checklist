@@ -1,6 +1,5 @@
 package com.kelp.campchecklist;
 
-import com.google.gson.Gson;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -12,9 +11,20 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import java.util.function.Consumer;
 
 public final class Network {
-    private static final Gson GSON=new Gson();
+    public static final String PROTOCOL_VERSION="2";
+    static boolean isProtocolCompatible(String remoteVersion) { return PROTOCOL_VERSION.equals(remoteVersion); }
+    static String protocolMismatchMessage(String remoteVersion) { return "CAMP Checklist protocol mismatch: local="+PROTOCOL_VERSION+", remote="+remoteVersion; }
     /** Installed only on the physical client. No rendering references are loaded by the server. */
     public static Consumer<Message> clientReceiver=m -> {};
+    public static Consumer<ViewModel> snapshotReceiver=m -> {};
+    public record Snapshot(ViewModel model) implements CustomPacketPayload {
+        public static final Type<Snapshot> TYPE=new Type<>(ResourceLocation.fromNamespaceAndPath(CampChecklist.ID,"snapshot"));
+        public static final StreamCodec<RegistryFriendlyByteBuf,Snapshot> CODEC=new StreamCodec<>() {
+            public Snapshot decode(RegistryFriendlyByteBuf b) { return new Snapshot(ViewModelStreamCodec.read(b)); }
+            public void encode(RegistryFriendlyByteBuf b,Snapshot value) { ViewModelStreamCodec.write(b,value.model()); }
+        };
+        public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
     public record Message(String kind,String text,boolean completed) implements CustomPacketPayload {
         public static final Type<Message> TYPE=new Type<>(ResourceLocation.fromNamespaceAndPath(CampChecklist.ID,"message"));
         public static final StreamCodec<RegistryFriendlyByteBuf,Message> CODEC=new StreamCodec<>() {
@@ -24,8 +34,9 @@ public final class Network {
         public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
     public static void register(RegisterPayloadHandlersEvent e) {
-        var registrar=e.registrar("1");
+        var registrar=e.registrar(PROTOCOL_VERSION);
         registrar.playToClient(Message.TYPE,Message.CODEC,(m,ctx) -> ctx.enqueueWork(() -> clientReceiver.accept(m)));
+        registrar.playToClient(Snapshot.TYPE,Snapshot.CODEC,(m,ctx) -> ctx.enqueueWork(() -> snapshotReceiver.accept(m.model())));
         registrar.playToServer(Manual.TYPE,Manual.CODEC,(m,ctx) -> {
             ctx.enqueueWork(() -> {
                 if (ctx.player() instanceof ServerPlayer p) CampChecklist.runtime(p.server).manual(m.id,m.completed);
@@ -50,8 +61,7 @@ public final class Network {
         public static final StreamCodec<RegistryFriendlyByteBuf,Open> CODEC=StreamCodec.unit(new Open());
         public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
-    public static ViewModel decode(String json) { return GSON.fromJson(json,ViewModel.class); }
-    public static void send(ServerPlayer p,ViewModel model) { PacketDistributor.sendToPlayer(p,new Message("snapshot",GSON.toJson(model),false)); }
+    public static void send(ServerPlayer p,ViewModel model) { PacketDistributor.sendToPlayer(p,new Snapshot(model)); }
     public static void broadcast(MinecraftServer s,ViewModel model) { for (ServerPlayer p:s.getPlayerList().getPlayers()) send(p,model); }
     public static void toast(MinecraftServer s,String title) { for (ServerPlayer p:s.getPlayerList().getPlayers()) PacketDistributor.sendToPlayer(p,new Message("toast",title,false)); }
     public static void requestManual(String id,boolean completed) { PacketDistributor.sendToServer(new Manual(id,completed)); }

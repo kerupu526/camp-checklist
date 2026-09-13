@@ -7,12 +7,29 @@ import java.util.*;
 /** Server definitions; resource paths are the sole identity (no duplicate JSON id field). */
 public final class Definitions {
     private Definitions() {}
+    public enum SchemaKind { LEGACY, NATIVE }
     public record Tab(ResourceLocation id, String title, String description, String icon, int order) {}
     public record Goal(ResourceLocation id, ResourceLocation tab, String title, String description,
                        String icon, int order, String type, String item, String tag, String block,
                        String advancement, String checker, double target, String unit, String displayUnit,
-                       JsonObject parameters) {
+                       JsonObject parameters, SchemaKind schemaKind,
+                       com.kelp.campchecklist.internal.condition.ConditionNode condition) {
+        /** Source-compatible constructor for existing legacy callers and tests. */
+        public Goal(ResourceLocation id, ResourceLocation tab, String title, String description,
+                    String icon, int order, String type, String item, String tag, String block,
+                    String advancement, String checker, double target, String unit, String displayUnit,
+                    JsonObject parameters) {
+            this(id, tab, title, description, icon, order, type, item, tag, block, advancement, checker,
+                    target, unit, displayUnit, parameters, SchemaKind.LEGACY, null);
+        }
+        /** Internal normalization seam; legacy persistence keys remain byte-for-byte compatible. */
+        public com.kelp.campchecklist.internal.condition.ConditionNode normalizedCondition() {
+            return schemaKind == SchemaKind.NATIVE ? condition : com.kelp.campchecklist.internal.condition.ConditionNormalizer.legacy(this);
+        }
         public String signature() {
+            if (schemaKind == SchemaKind.NATIVE) {
+                return com.kelp.campchecklist.internal.condition.TrackingSignatures.signature(condition);
+            }
             return type + "|" + unit + "|" + item + "|" + tag + "|" + block + "|" + advancement + "|" + checker + "|" + canonical(parameters);
         }
     }
@@ -32,6 +49,10 @@ public final class Definitions {
         return new Tab(id, str(j,"title",id.toString()),str(j,"description",""),str(j,"icon","minecraft:book"),order(j));
     }
     public static Goal goal(ResourceLocation id, JsonObject j) {
+        boolean hasType = j.has("type");
+        boolean hasCondition = j.has("condition");
+        if (hasType == hasCondition) throw new IllegalArgumentException("Goal must define exactly one of type or condition");
+        if (hasCondition) return nativeGoal(id, j);
         String type = str(j,"type","");
         if (!Set.of("manual","acquire_item","craft_item","craft_count","place_block","advancement","custom").contains(type)) throw new IllegalArgumentException("Unknown type " + type);
         String item = str(j,"item",""), tag = str(j,"tag",""), block = str(j,"block","");
@@ -51,5 +72,15 @@ public final class Definitions {
             throw new IllegalArgumentException("Count and distance units cannot be mixed");
         }
         return new Goal(id,id(j.get("tab").getAsString()),str(j,"title",id.toString()),str(j,"description",""),str(j,"icon","minecraft:book"),order(j),type,item,tag,block,advancement,checker,target,unit,displayUnit,j.has("parameters") ? j.getAsJsonObject("parameters").deepCopy() : new JsonObject());
+    }
+
+    private static Goal nativeGoal(ResourceLocation id, JsonObject j) {
+        if (!j.get("condition").isJsonObject()) throw new IllegalArgumentException("condition must be an object");
+        if (!j.has("tab") || !j.get("tab").isJsonPrimitive()) throw new IllegalArgumentException("Missing tab");
+        ResourceLocation tab = id(j.get("tab").getAsString());
+        var condition = com.kelp.campchecklist.internal.condition.ConditionNormalizer.nativeCondition(j.getAsJsonObject("condition"));
+        return new Goal(id, tab, str(j,"title",id.toString()), str(j,"description",""),
+                str(j,"icon","minecraft:book"), order(j), "", "", "", "", "", "", 1,
+                "count", "count", new JsonObject(), SchemaKind.NATIVE, condition);
     }
 }

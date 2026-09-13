@@ -1,6 +1,14 @@
 # CAMP Checklist
 
+Condition Framework는 native condition 실행, addon API, native opaque node storage와 C5 재귀
+condition presentation snapshot까지 구현되어 있습니다. 저장 호환성·현재 제한·단계별 설계는
+[Condition Framework 기록](CONDITION-FRAMEWORK.md)을 참고하세요.
+
 실행 검증 결과와 남은 수동 확인 항목은 [개발 환경 검증 기록](DEVELOPMENT-VERIFICATION.md)을 참고하세요.
+
+현재 milestone은 0.7.1입니다. native condition, addon API, native node state, protocol 2의 typed
+recursive presentation snapshot과 내부 의존성 기반 무효화 스케줄러까지 구현되었습니다. 실제 Checklist
+화면의 작은 창 표시와 resource reload 직후 첫 열기 안정성을 보강했으며, 최종 화면 회귀 QA는 별도 확인 항목입니다.
 
 CAMP Checklist is a NeoForge 1.21.1 mod. The project keeps its Minecraft,
 NeoForge, LDLib2, and optional integration versions in
@@ -65,6 +73,12 @@ Enable exactly the integration needed for a run with `campProfile`:
 .\gradlew.bat runClient -PcampProfile=mekanism
 .\gradlew.bat runClient -PcampProfile=pneumaticcraft
 .\gradlew.bat runClient -PcampProfile=all
+```
+
+전체 optional integration을 포함한 수동 QA는 별도 실행 폴더를 사용합니다.
+
+```powershell
+.\gradlew.bat runClient '-PcampProfile=all' '-PcampGameDir=run/c5-full-qa'
 ```
 
 Multiple profiles can be comma-separated, for example

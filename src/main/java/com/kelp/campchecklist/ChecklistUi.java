@@ -16,6 +16,7 @@ import com.lowdragmc.lowdraglib2.gui.ui.elements.TabView;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Toggle;
 import com.lowdragmc.lowdraglib2.gui.ui.event.HoverTooltips;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
+import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -43,10 +44,24 @@ public final class ChecklistUi {
     /** Weak keys let a closed ModularUI be collected without requiring a client-only lifecycle hook. */
     private static final Set<Instance> CLIENT_INSTANCES = java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>());
     private static final Map<MinecraftServer, Instance> PREWARMED_SERVERS = java.util.Collections.synchronizedMap(new java.util.IdentityHashMap<>());
+    private static final Map<MinecraftServer, Map<java.util.UUID, PendingServerOpen>> PENDING_SERVER_OPENS = new IdentityHashMap<>();
+    /** Integrated server and client share LDLib2's singleton font manager in one JVM. */
+    private static final Object UI_CONSTRUCTION_LOCK = new Object();
     private static volatile ViewModel clientModel = ViewModel.EMPTY;
     private static volatile Instance prewarmedClient;
 
     private ChecklistUi() {}
+
+    private static final class PendingServerOpen {
+        private final ServerPlayer player;
+        private final UiRetryPolicy.BoundedRetry retry = new UiRetryPolicy.BoundedRetry();
+        private int retryTick;
+
+        private PendingServerOpen(ServerPlayer player, int retryTick) {
+            this.player = player;
+            this.retryTick = retryTick;
+        }
+    }
 
     public static void registerMenu() {
         PlayerUIMenuType.register(MENU_ID, player -> new PlayerUIMenuType.PlayerUIHolder() {
@@ -58,15 +73,75 @@ public final class ChecklistUi {
     }
 
     public static void open(ServerPlayer player) {
-        Network.send(player, CampChecklist.runtime(player.server).view());
-        PlayerUIMenuType.openUI(player, MENU_ID);
+        MinecraftServer server = player.server;
+        Map<java.util.UUID, PendingServerOpen> pending = PENDING_SERVER_OPENS.computeIfAbsent(server, ignored -> new HashMap<>());
+        if (pending.containsKey(player.getUUID())) return;
+        Network.send(player, CampChecklist.runtime(server).view());
+        attemptServerOpen(player, null);
+    }
+
+    /** Retries one transient open failure after the server has advanced to the next tick. */
+    public static void tickServer(MinecraftServer server) {
+        Map<java.util.UUID, PendingServerOpen> pending = PENDING_SERVER_OPENS.get(server);
+        if (pending == null || pending.isEmpty()) return;
+        int currentTick = server.getTickCount();
+        for (Map.Entry<java.util.UUID, PendingServerOpen> entry : List.copyOf(pending.entrySet())) {
+            PendingServerOpen state = entry.getValue();
+            if (state.retryTick > currentTick || !state.retry.take()) continue;
+            if (state.player.isRemoved()) {
+                pending.remove(entry.getKey());
+                continue;
+            }
+            attemptServerOpen(state.player, state);
+        }
+        if (pending.isEmpty()) PENDING_SERVER_OPENS.remove(server);
+    }
+
+    private static void attemptServerOpen(ServerPlayer player, PendingServerOpen state) {
+        try {
+            PlayerUIMenuType.openUI(player, MENU_ID);
+            Map<java.util.UUID, PendingServerOpen> pending = PENDING_SERVER_OPENS.get(player.server);
+            if (pending != null) {
+                pending.remove(player.getUUID());
+                if (pending.isEmpty()) PENDING_SERVER_OPENS.remove(player.server);
+            }
+        } catch (Throwable failure) {
+            if (!UiRetryPolicy.isTransientFontFailure(failure)) {
+                removePendingServerOpen(player);
+                if (failure instanceof RuntimeException runtime) throw runtime;
+                if (failure instanceof Error error) throw error;
+                throw new RuntimeException(failure);
+            }
+            if (state == null) {
+                state = new PendingServerOpen(player, player.server.getTickCount() + 1);
+                if (state.retry.schedule()) {
+                    PENDING_SERVER_OPENS.computeIfAbsent(player.server, ignored -> new HashMap<>())
+                            .put(player.getUUID(), state);
+                    CampChecklist.LOGGER.warn("Checklist server UI open hit the transient LDLib2 font race; retrying once on the next server tick");
+                    return;
+                }
+            }
+            removePendingServerOpen(player);
+            CampChecklist.LOGGER.error("Checklist server UI open failed after the bounded LDLib2 font-race retry", failure);
+        }
+    }
+
+    private static void removePendingServerOpen(ServerPlayer player) {
+        Map<java.util.UUID, PendingServerOpen> pending = PENDING_SERVER_OPENS.get(player.server);
+        if (pending != null) {
+            pending.remove(player.getUUID());
+            if (pending.isEmpty()) PENDING_SERVER_OPENS.remove(player.server);
+        }
     }
 
     /** Builds the first server-side UI instance during world startup, before a key press can request it. */
     public static void prewarmServer(MinecraftServer server) {
         long start = System.nanoTime();
-        Instance warmup = new Instance(false);
-        warmup.refresh(CampChecklist.runtime(server).view());
+        Instance warmup;
+        synchronized (UI_CONSTRUCTION_LOCK) {
+            warmup = new Instance(false);
+            warmup.refresh(CampChecklist.runtime(server).view());
+        }
         PREWARMED_SERVERS.put(server, warmup);
         long elapsed = System.nanoTime() - start;
         CampChecklist.LOGGER.info("Checklist server UI prewarm: loaded={}, elapsed={}ms",
@@ -77,11 +152,14 @@ public final class ChecklistUi {
     public static void prewarmClient(ViewModel model) {
         if (prewarmedClient != null) return;
         long start = System.nanoTime();
-        Instance warmup = new Instance(true);
-        warmup.refresh(model);
-        prewarmedClient = warmup;
+        synchronized (UI_CONSTRUCTION_LOCK) {
+            if (prewarmedClient != null) return;
+            Instance warmup = new Instance(true);
+            warmup.refresh(model);
+            prewarmedClient = warmup;
+        }
         CampChecklist.LOGGER.info("Checklist client UI prewarm: loaded={}, elapsed={}ms",
-                warmup.templateLoaded, (System.nanoTime() - start) / 1_000_000.0);
+                prewarmedClient != null && prewarmedClient.templateLoaded, (System.nanoTime() - start) / 1_000_000.0);
     }
 
     private static ModularUI create(Player player) {
@@ -99,11 +177,16 @@ public final class ChecklistUi {
             instance = PREWARMED_SERVERS.remove(((ServerPlayer) player).server);
         }
         boolean reusedPrewarm = instance != null;
-        if (instance == null) instance = new Instance(player.level().isClientSide);
-        long templateEnd = System.nanoTime();
-        long refreshStart = System.nanoTime();
-        instance.refresh(model);
-        long refreshEnd = System.nanoTime();
+        long templateEnd;
+        long refreshStart;
+        long refreshEnd;
+        synchronized (UI_CONSTRUCTION_LOCK) {
+            if (instance == null) instance = new Instance(player.level().isClientSide);
+            templateEnd = System.nanoTime();
+            refreshStart = templateEnd;
+            instance.refresh(model);
+            refreshEnd = System.nanoTime();
+        }
         CampChecklist.LOGGER.info(
                 "Checklist {} create timing: prewarmed={}, viewModel={}ms, template={}ms, initialRefresh={}ms",
                 player.level().isClientSide ? "client" : "server",
@@ -118,8 +201,10 @@ public final class ChecklistUi {
     /** Refreshes open client menus using the existing core snapshot. */
     public static void setClientModel(ViewModel model) {
         clientModel = model;
-        if (prewarmedClient != null) prewarmedClient.refresh(model);
-        for (Instance instance : List.copyOf(CLIENT_INSTANCES)) instance.refresh(model);
+        synchronized (UI_CONSTRUCTION_LOCK) {
+            if (prewarmedClient != null) prewarmedClient.refresh(model);
+            for (Instance instance : List.copyOf(CLIENT_INSTANCES)) instance.refresh(model);
+        }
     }
 
     public static void clearClientInstances() {
@@ -130,6 +215,7 @@ public final class ChecklistUi {
 
     public static void clearServer(MinecraftServer server) {
         PREWARMED_SERVERS.remove(server);
+        PENDING_SERVER_OPENS.remove(server);
     }
 
     private static UITemplate loadTemplate() {
@@ -173,6 +259,12 @@ public final class ChecklistUi {
 
         int dragBoundScrollerCount() {
             return instance.dragBoundScrollers.size();
+        }
+
+        int dragUpdateListenerCount() {
+            return instance.dragBoundScrollers.stream()
+                    .mapToInt(scroller -> scroller.getCaptureListeners(UIEvents.DRAG_UPDATE).size())
+                    .sum();
         }
     }
 
@@ -492,7 +584,7 @@ public final class ChecklistUi {
         }
 
         private void reconcileDetails(UIElement card, ViewModel.Goal goal) {
-            List<String> desiredOrder = goal.details().stream().map(ViewModel.Detail::id).toList();
+            List<String> desiredOrder = uiDetails(goal).stream().map(ViewModel.Detail::id).toList();
             if (desiredOrder.equals(renderedDetailOrder.get(goal.id()))) return;
             UIElement details = card.selectId("goal-details").findFirst().orElse(null);
             if (details != null) rebuildDetails(details, goal);
@@ -502,7 +594,7 @@ public final class ChecklistUi {
             for (DetailRow oldRow : detailRows.getOrDefault(goal.id(), List.of())) oldRow.element().removeSelf();
             UIElement prototype = detailPrototypes.get(goal.id());
             List<DetailRow> rows = new ArrayList<>();
-            if (prototype != null) for (ViewModel.Detail detail : goal.details()) {
+            if (prototype != null) for (ViewModel.Detail detail : uiDetails(goal)) {
                 UIElement row = prototype.copy();
                 ItemSlot icon = row.selectId("detail-icon", ItemSlot.class).findFirst().orElse(null);
                 Label name = row.selectId("detail-name", Label.class).findFirst().orElse(null);
@@ -517,29 +609,30 @@ public final class ChecklistUi {
                 rows.add(new DetailRow(row, icon, name, progress));
             }
             detailRows.put(goal.id(), rows);
-            renderedDetailOrder.put(goal.id(), goal.details().stream().map(ViewModel.Detail::id).toList());
+            renderedDetailOrder.put(goal.id(), uiDetails(goal).stream().map(ViewModel.Detail::id).toList());
             if (rows.isEmpty()) expandedGoals.remove(goal.id());
-            details.setDisplay(!goal.details().isEmpty() && expandedGoals.getOrDefault(goal.id(), false));
+            details.setDisplay(!uiDetails(goal).isEmpty() && expandedGoals.getOrDefault(goal.id(), false));
         }
 
         private void updateDetails(UIElement card, ViewModel.Goal goal) {
             UIElement details = card.selectId("goal-details").findFirst().orElse(null);
             if (details == null) return;
             List<DetailRow> rows = detailRows.getOrDefault(goal.id(), List.of());
-            for (int i = 0; i < Math.min(rows.size(), goal.details().size()); i++) {
-                ViewModel.Detail detail = goal.details().get(i);
+            List<ViewModel.Detail> projected=uiDetails(goal);
+            for (int i = 0; i < Math.min(rows.size(), projected.size()); i++) {
+                ViewModel.Detail detail = projected.get(i);
                 DetailRow row = rows.get(i);
                 DetailPresentation presentation = detailPresentation(detail);
                 if (row.icon() != null) row.icon().setItem(presentation.stack());
                 if (row.name() != null) row.name().setText(presentation.name());
-                if (row.progress() != null) row.progress().setText(Component.literal(formatDetailProgress(detail)));
+                if (row.progress() != null) row.progress().setText(Component.literal(detail.progressText().isEmpty() ? formatDetailProgress(detail) : detail.progressText()));
                 CampChecklist.LOGGER.debug(
                         "Checklist detail {} item={} display={} rowIdentity={} nameWidth={} progressWidth={} progress={}",
                         goal.id(), detail.id(), presentation.name(), Integer.toHexString(System.identityHashCode(row)),
                         row.name() == null ? -1 : row.name().getContentWidth(),
                         row.progress() == null ? -1 : row.progress().getContentWidth(), formatDetailProgress(detail));
             }
-            details.setDisplay(!goal.details().isEmpty() && expandedGoals.getOrDefault(goal.id(), false));
+            details.setDisplay(!projected.isEmpty() && expandedGoals.getOrDefault(goal.id(), false));
         }
 
         private void installCardInteractions(UIElement card, ViewModel.Goal goal) {
@@ -599,17 +692,24 @@ public final class ChecklistUi {
             }, true);
             list.addEventListener(UIEvents.MOUSE_MOVE, event -> {
                 if (draggingScroller != list) return;
-                float delta = event.y - dragLastY;
-                dragLastY = event.y;
-                if (!dragMoved && Math.abs(event.y - dragStartY) < 4) return;
-                dragMoved = true;
-                suppressNextCardClick = true;
-                list.verticalScroller.scrollValue(-delta);
-                event.stopPropagation();
+                scrollFromDrag(list,event.y,event.y - dragLastY,event);
+            }, true);
+            // LDLib2 emits DRAG_UPDATE once the pointer has crossed its drag threshold;
+            // MOUSE_MOVE is hover-only for many child elements and is not reliable here.
+            list.addEventListener(UIEvents.DRAG_UPDATE, event -> {
+                if (draggingScroller != list) return;
+                scrollFromDrag(list,event.y,event.deltaY,event);
             }, true);
             list.addEventListener(UIEvents.MOUSE_UP, event -> {
                 if (draggingScroller == list) {
                     if (dragMoved) suppressNextCardClick = true;
+                    draggingScroller = null;
+                    dragMoved = false;
+                }
+            }, true);
+            list.addEventListener(UIEvents.DRAG_END, event -> {
+                if (draggingScroller == list) {
+                    suppressNextCardClick = dragMoved;
                     draggingScroller = null;
                     dragMoved = false;
                 }
@@ -644,6 +744,11 @@ public final class ChecklistUi {
             return new DetailPresentation(ItemStack.EMPTY, fallback);
         }
 
+        /** C5 keeps the received recursive tree intact until this final Ore UI projection. */
+        private static List<ViewModel.Detail> uiDetails(ViewModel.Goal goal) {
+            return goal.evaluation()==null ? goal.details() : ConditionPresentation.rows(goal.evaluation());
+        }
+
         private static String formatDetailProgress(ViewModel.Detail detail) {
             String unit = detail.displayUnit();
             String suffix = switch (unit) {
@@ -662,6 +767,18 @@ public final class ChecklistUi {
                 target.put(key, content);
                 logContentShape(key, content);
             });
+        }
+
+        private void scrollFromDrag(ScrollerView list,float y,float delta,UIEvent event) {
+            CampChecklist.LOGGER.debug("QA_DRAG y={} delta={} start={} before={} range={}", y, delta, dragStartY,
+                    list.verticalScroller.getNormalizedValue(), list.getContainerHeight() - list.viewPort.getContentHeight());
+            dragLastY = y;
+            if (!dragMoved && Math.abs(y - dragStartY) < 4) return;
+            dragMoved = true;
+            suppressNextCardClick = true;
+            list.verticalScroller.scrollValue(-delta);
+            CampChecklist.LOGGER.debug("QA_DRAG after={}", list.verticalScroller.getNormalizedValue());
+            event.stopPropagation();
         }
 
         private ScrollerView findCardList(UIElement content, String tabId) {

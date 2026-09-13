@@ -22,6 +22,7 @@ public final class CampChecklist {
     private static final Map<MinecraftServer,ChecklistLoader> LOADERS=new IdentityHashMap<>();
     private static ChecklistLoader fallbackLoader=new ChecklistLoader();
     public CampChecklist(IEventBus bus) {
+        com.kelp.campchecklist.internal.condition.ConditionRegistration.install(bus);
         IntegrationBootstrap.register();
         ChecklistUi.registerMenu();
         bus.addListener(Network::register);
@@ -36,14 +37,15 @@ public final class CampChecklist {
             runtime(e.getServer()).initialize();
             ChecklistUi.prewarmServer(e.getServer());
         });
-        NeoForge.EVENT_BUS.addListener((ServerTickEvent.Post e) -> { IntegrationBootstrap.tick(e.getServer()); runtime(e.getServer()).tick(); });
+        NeoForge.EVENT_BUS.addListener((ServerTickEvent.Post e) -> { ChecklistUi.tickServer(e.getServer()); IntegrationBootstrap.tick(e.getServer()); runtime(e.getServer()).tick(); });
         NeoForge.EVENT_BUS.addListener((ServerStoppedEvent e) -> {
             ChecklistUi.clearServer(e.getServer());
             RUNTIMES.remove(e.getServer());
             LOADERS.remove(e.getServer());
         });
         NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent e) -> { if (e.getEntity() instanceof ServerPlayer p) runtime(p.server).login(p); });
-        NeoForge.EVENT_BUS.addListener((AdvancementEvent.AdvancementEarnEvent e) -> { if (e.getEntity() instanceof ServerPlayer p) runtime(p.server).checkAdvancements(p); });
+        NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedOutEvent e) -> { if (e.getEntity() instanceof ServerPlayer p) runtime(p.server).logout(p); });
+        NeoForge.EVENT_BUS.addListener((AdvancementEvent.AdvancementEarnEvent e) -> { if (e.getEntity() instanceof ServerPlayer p) runtime(p.server).checkAdvancement(p,e.getAdvancement().id()); });
         NeoForge.EVENT_BUS.addListener((BlockEvent.EntityPlaceEvent e) -> { if (!e.isCanceled() && e.getEntity() instanceof ServerPlayer p && e.getLevel() instanceof net.minecraft.server.level.ServerLevel level) runtime(p.server).place(level,e.getPos(),e.getPlacedBlock()); });
     }
     public static ChecklistRuntime runtime(MinecraftServer server) { return RUNTIMES.computeIfAbsent(server,ChecklistRuntime::new); }
